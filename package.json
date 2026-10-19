@@ -15,6 +15,7 @@
     "@tanstack/react-virtual": "^3.14.20",
     "@trigger.dev/sdk": "^4.7.4",
     "googleapis": "^186.0.0",
+    "lucide-react": "^1.59.0",
     "next": "16.4.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
