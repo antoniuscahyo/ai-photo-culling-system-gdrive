@@ -11,7 +11,7 @@ const GRAY_SIZE = 512;
 
 /** 64-bit dHash (9x8 grayscale, bandingkan pixel bersebelahan) sebagai 16 char hex. */
 export async function dHash(buf: Buffer): Promise<string> {
-  const { data } = await sharp(buf).grayscale().resize(9, 8, { fit: "fill" }).raw().toBuffer({ resolveWithObject: true });
+  const { data } = await sharp(buf).rotate().grayscale().resize(9, 8, { fit: "fill" }).raw().toBuffer({ resolveWithObject: true });
   let bits = "";
   for (let y = 0; y < 8; y++)
     for (let x = 0; x < 8; x++) bits += data[y * 9 + x] > data[y * 9 + x + 1] ? "1" : "0";
@@ -47,7 +47,7 @@ export const THRESHOLDS = {
 };
 
 export async function technicalFilter(buf: Buffer): Promise<TechnicalResult> {
-  const { data, info } = await sharp(buf)
+  const { data, info } = await sharp(buf).rotate()
     .grayscale()
     .resize(GRAY_SIZE, GRAY_SIZE, { fit: "inside" })
     .raw()

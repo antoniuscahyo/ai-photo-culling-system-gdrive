@@ -41,17 +41,19 @@ export async function GET(
 
     const buffer = Buffer.from(res.data as ArrayBuffer);
     
-    // Resize down to 1024 max dimension for fast display
+    // .rotate() automatically reads EXIF Orientation tag and rotates image to upright!
+    // Resize down to 800px max dimension for fast, snappy mobile loading
     const thumbBuffer = await sharp(buffer)
-      .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 80 })
+      .rotate()
+      .resize(800, 800, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 80, progressive: true })
       .toBuffer();
 
     return new NextResponse(thumbBuffer as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "image/jpeg",
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        "Cache-Control": "public, max-age=604800, immutable",
       },
     });
   } catch (err: unknown) {

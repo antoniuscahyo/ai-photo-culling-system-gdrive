@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { updatePhotoStatusAction, triggerSyncAction } from "@/app/actions/projects";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { LazyImage } from "@/components/LazyImage";
 import {
   Sparkles,
   CheckCircle2,
@@ -398,20 +399,11 @@ export function CullingWorkspace({
                     >
                       {/* Image Thumbnail */}
                       <div className="relative aspect-4/3 bg-slate-950 overflow-hidden flex items-center justify-center">
-                        {photo.thumbnail_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={`/api/photos/${photo.id}/thumbnail`}
-                            alt={photo.file_name}
-                            loading="lazy"
-                            className="w-full h-full object-cover group-hover:scale-102 transition duration-300"
-                          />
-                        ) : (
-                          <div className="text-slate-600 text-xs flex flex-col items-center gap-1">
-                            <Camera className="w-6 h-6" />
-                            <span>Preview</span>
-                          </div>
-                        )}
+                        <LazyImage
+                          src={`/api/photos/${photo.id}/thumbnail`}
+                          alt={photo.file_name}
+                          className="w-full h-full object-cover group-hover:scale-102 transition duration-300"
+                        />
 
                         {/* Status Badge */}
                         <div className="absolute top-2.5 left-2.5">
