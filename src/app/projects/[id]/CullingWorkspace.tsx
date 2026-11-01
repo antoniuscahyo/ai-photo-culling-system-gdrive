@@ -8,7 +8,6 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
-
   EyeOff,
   Star,
   RefreshCw,
@@ -16,7 +15,6 @@ import {
   X,
   Camera,
   Layers,
-
   ExternalLink,
 } from "lucide-react";
 
@@ -76,6 +74,27 @@ export function CullingWorkspace({
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [columnsCount, setColumnsCount] = useState(3);
+
+  // Responsive column count based on parent container width
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updateColumns = () => {
+      const width = parentRef.current?.offsetWidth || window.innerWidth;
+      if (width < 640) {
+        setColumnsCount(1);
+      } else if (width < 1024) {
+        setColumnsCount(2);
+      } else {
+        setColumnsCount(3);
+      }
+    };
+
+    updateColumns();
+    window.addEventListener("resize", updateColumns);
+    return () => window.removeEventListener("resize", updateColumns);
+  }, []);
 
   // Setup Supabase Realtime for live scanning & culling updates
   useEffect(() => {
@@ -142,8 +161,6 @@ export function CullingWorkspace({
   }, [photos, activeTab]);
 
   // Virtualizer setup
-  // We chunk the photos into rows of 4 columns for desktop (or 2 for mobile)
-  const columnsCount = 3;
   const rows = useMemo(() => {
     const result: Photo[][] = [];
     for (let i = 0; i < filteredPhotos.length; i += columnsCount) {
@@ -152,12 +169,10 @@ export function CullingWorkspace({
     return result;
   }, [filteredPhotos, columnsCount]);
 
-  const parentRef = useRef<HTMLDivElement>(null);
-
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 360,
+    estimateSize: () => (columnsCount === 1 ? 380 : 360),
     overscan: 3,
   });
 
@@ -352,6 +367,8 @@ export function CullingWorkspace({
               return (
                 <div
                   key={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
                   style={{
                     position: "absolute",
                     top: 0,
@@ -359,7 +376,13 @@ export function CullingWorkspace({
                     width: "100%",
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
-                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pb-4"
+                  className={`grid gap-4 pb-4 ${
+                    columnsCount === 1
+                      ? "grid-cols-1"
+                      : columnsCount === 2
+                      ? "grid-cols-2"
+                      : "grid-cols-3"
+                  }`}
                 >
                   {rowPhotos.map((photo) => (
                     <div
