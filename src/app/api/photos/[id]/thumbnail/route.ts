@@ -53,7 +53,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": "image/jpeg",
-        "Cache-Control": "public, max-age=604800, immutable",
+        "Cache-Control": "public, no-store, no-cache, must-revalidate",
       },
     });
   } catch (err: unknown) {

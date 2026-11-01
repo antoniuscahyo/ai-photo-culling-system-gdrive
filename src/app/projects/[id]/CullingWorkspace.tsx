@@ -173,7 +173,7 @@ export function CullingWorkspace({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => (columnsCount === 1 ? 380 : 360),
+    estimateSize: () => (columnsCount === 1 ? 460 : 420),
     overscan: 3,
   });
 
@@ -398,11 +398,11 @@ export function CullingWorkspace({
                       }`}
                     >
                       {/* Image Thumbnail */}
-                      <div className="relative aspect-4/3 bg-slate-950 overflow-hidden flex items-center justify-center">
+                      <div className="relative aspect-3/4 max-h-[420px] bg-slate-950 overflow-hidden flex items-center justify-center">
                         <LazyImage
                           src={`/api/photos/${photo.id}/thumbnail`}
                           alt={photo.file_name}
-                          className="w-full h-full object-cover group-hover:scale-102 transition duration-300"
+                          className="w-full h-full object-contain group-hover:scale-102 transition duration-300"
                         />
 
                         {/* Status Badge */}
