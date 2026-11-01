@@ -1,27 +1,34 @@
-import { task, logger, queue } from "@trigger.dev/sdk";
 import type { drive_v3 } from "googleapis";
+import { task, logger, queue } from "@trigger.dev/sdk";
 import { admin, driveForUser, preflight } from "@/lib/gdrive";
 import { resizeThumbnail } from "@/lib/drive-url";
 import { dHash, technicalFilter, clusterPhotos } from "@/lib/image-analysis";
 import { cullCluster } from "@/lib/culling-ai";
 
-// Throttle agar aman dari rate limit Drive & Gemini
-const driveQueue = queue({ name: "gdrive", concurrencyLimit: 15 });
-const aiQueue = queue({ name: "gemini", concurrencyLimit: 5 });
+const driveQueue = queue({ name: "gdrive", concurrencyLimit: 10 });
+const aiQueue = queue({ name: "gemini", concurrencyLimit: 3 });
 
-async function fetchBuf(url: string): Promise<Buffer> {
-  for (let attempt = 0; ; attempt++) {
-    const r = await fetch(url);
-    if (r.ok) return Buffer.from(await r.arrayBuffer());
-    if (attempt >= 3 || ![429, 500, 502, 503].includes(r.status)) throw new Error(`fetch ${r.status}`);
-    await new Promise((res) => setTimeout(res, 500 * 2 ** attempt));
+async function fetchPhotoBuffer(drive: drive_v3.Drive, gdriveFileId: string): Promise<Buffer> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await drive.files.get(
+        { fileId: gdriveFileId, alt: "media", supportsAllDrives: true },
+        { responseType: "arraybuffer" }
+      );
+      return Buffer.from(res.data as ArrayBuffer);
+    } catch (err: unknown) {
+      if (attempt === 2) throw err;
+      await new Promise((res) => setTimeout(res, 1000 * 2 ** attempt));
+    }
   }
+  throw new Error("Failed to fetch photo buffer");
 }
 
 /** Fase 0-3: preflight, indexing, hash, hard technical filter, clustering. */
 export const scanProject = task({
   id: "scan-project",
   queue: driveQueue,
+  machine: { preset: "small-2x" }, // 1 vCPU, 1 GB RAM (avoid OOM with sharp)
   run: async (p: { projectId: string }) => {
     const db = admin();
     const { data: proj } = await db.from("projects").select("*").eq("id", p.projectId).single();
@@ -47,7 +54,6 @@ export const scanProject = task({
 
       const rows = files.map((f) => {
         const m = f.imageMediaMetadata ?? {};
-        // EXIF time format "YYYY:MM:DD HH:MM:SS" (tanpa timezone -> diperlakukan UTC, hanya dipakai untuk selisih relatif)
         const t = m.time ? new Date(m.time.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3").replace(" ", "T") + "Z") : null;
         return {
           project_id: proj.id, gdrive_file_id: f.id, file_name: f.name,
@@ -60,15 +66,15 @@ export const scanProject = task({
         await db.from("photos").upsert(rows.slice(i, i + 500), { onConflict: "project_id,gdrive_file_id" });
       await db.from("projects").update({ total_photos: rows.length }).eq("id", proj.id);
 
-      // Fase 2+3: dHash + hard technical filter (pakai thumbnail =s1024)
-      const { data: photos } = await db.from("photos").select("id,thumbnail_url").eq("project_id", proj.id);
+      // Fase 2+3: dHash + hard technical filter (chunk size 4 to keep RAM safe)
+      const { data: photos } = await db.from("photos").select("id,gdrive_file_id").eq("project_id", proj.id);
       let done = 0;
-      const CONC = 15;
+      const CONC = 4;
       for (let i = 0; i < (photos?.length ?? 0); i += CONC) {
         await Promise.all(photos!.slice(i, i + CONC).map(async (ph) => {
-          if (!ph.thumbnail_url) return;
+          if (!ph.gdrive_file_id) return;
           try {
-            const buf = await fetchBuf(ph.thumbnail_url);
+            const buf = await fetchPhotoBuffer(drive, ph.gdrive_file_id);
             const [hash, tech] = await Promise.all([dHash(buf), technicalFilter(buf)]);
             await db.from("photos").update({
               dhash: hash, sharpness_score: tech.sharpness,
@@ -102,21 +108,27 @@ export const scanProject = task({
   },
 });
 
-/** Fase 4: comparative culling per cluster via Gemini. */
+/** Fase 4: comparative culling per cluster via Vision AI. */
 export const cullProject = task({
   id: "cull-project",
   queue: aiQueue,
+  machine: { preset: "small-2x" },
   run: async (p: { projectId: string }) => {
     const db = admin();
+    const { data: proj } = await db.from("projects").select("user_id").eq("id", p.projectId).single();
+    if (!proj) throw new Error("project not found");
+    const { drive } = await driveForUser(proj.user_id);
+
     const { data: clusters } = await db.from("photo_clusters").select("id").eq("project_id", p.projectId);
     for (const c of clusters ?? []) {
-      const { data: ph } = await db.from("photos").select("id,thumbnail_url,captured_at")
+      const { data: ph } = await db.from("photos").select("id,gdrive_file_id,captured_at")
         .eq("cluster_id", c.id).order("captured_at", { ascending: true });
       if (!ph?.length) continue;
-      const MAX = 6; // batasi foto per request; cluster lebih besar dipecah
+      const MAX = 4;
       for (let i = 0; i < ph.length; i += MAX) {
         const chunk = ph.slice(i, i + MAX);
-        const verdict = await cullCluster(await Promise.all(chunk.map((x) => fetchBuf(x.thumbnail_url!))));
+        const imageBuffers = await Promise.all(chunk.map((x) => fetchPhotoBuffer(drive, x.gdrive_file_id)));
+        const verdict = await cullCluster(imageBuffers);
         for (const v of verdict.photos) {
           const row = chunk[v.index]; if (!row) continue;
           const avg = (v.focus_sharpness + v.expression + v.composition + v.lighting + v.background_cleanliness) / 5;
@@ -132,7 +144,7 @@ export const cullProject = task({
   },
 });
 
-/** Fase 5: flat sync KEEP_BEST ke destination (COPY / MOVE). Dipicu manual dari dashboard. */
+/** Fase 5: flat sync KEEP_BEST ke destination (COPY / MOVE). */
 export const syncProject = task({
   id: "sync-project",
   queue: driveQueue,
