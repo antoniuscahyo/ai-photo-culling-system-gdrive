@@ -378,7 +378,7 @@ export function CullingWorkspace({
                         {photo.thumbnail_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={photo.thumbnail_url}
+                            src={`/api/photos/${photo.id}/thumbnail`}
                             alt={photo.file_name}
                             loading="lazy"
                             className="w-full h-full object-cover group-hover:scale-102 transition duration-300"
@@ -492,7 +492,7 @@ export function CullingWorkspace({
               {selectedPhoto.thumbnail_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={selectedPhoto.thumbnail_url}
+                  src={`/api/photos/${selectedPhoto.id}/thumbnail`}
                   alt={selectedPhoto.file_name}
                   className="max-h-[60vh] md:max-h-[85vh] w-auto object-contain"
                 />
