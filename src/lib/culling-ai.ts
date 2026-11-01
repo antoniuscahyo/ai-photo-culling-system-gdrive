@@ -1,7 +1,7 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import OpenAI from "openai";
 import { z } from "zod";
 
-export const MODEL = "gemini-2.5-flash";
+export const MODEL = process.env.VISION_MODEL || "antigravity-combo";
 
 export const PhotoVerdict = z.object({
   index: z.number().int(),
@@ -24,32 +24,24 @@ Bandingkan berdampingan menggunakan 5 pilar:
 3. Composition & framing: rule of thirds/leading lines/simetri/negative space. Tolak awkward cropping di sendi (pergelangan, lutut, dagu, dahi) dan horizon miring tidak disengaja.
 4. Lighting & exposure: detail gaun putih tidak blown-out, jas gelap tidak blocked-up, catchlight baik, tanpa bayangan keras/raccoon eyes.
 5. Background hygiene: objek tumbuh dari kepala, kru/photobomb, benda berantakan.
-Aturan WAJIB: tepat SATU foto berstatus KEEP_BEST (zero-drop rule). Sisanya ALTERNATIVE (layak tapi kalah bagus) atau REJECTED (gagal). Beri skor 0-10 per pilar dan critique singkat (1-2 kalimat, bahasa Indonesia). Jawab HANYA JSON sesuai schema.`;
+Aturan WAJIB: tepat SATU foto berstatus KEEP_BEST (zero-drop rule). Sisanya ALTERNATIVE (layak tapi kalah bagus) atau REJECTED (gagal). Beri skor 0-10 per pilar dan critique singkat (1-2 kalimat, bahasa Indonesia).
 
-const responseSchema = {
-  type: Type.OBJECT,
-  properties: {
-    photos: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          index: { type: Type.INTEGER },
-          focus_sharpness: { type: Type.NUMBER },
-          expression: { type: Type.NUMBER },
-          composition: { type: Type.NUMBER },
-          lighting: { type: Type.NUMBER },
-          background_cleanliness: { type: Type.NUMBER },
-          eyes_all_open: { type: Type.BOOLEAN },
-          status: { type: Type.STRING, enum: ["KEEP_BEST", "ALTERNATIVE", "REJECTED"] },
-          critique: { type: Type.STRING },
-        },
-        required: ["index","focus_sharpness","expression","composition","lighting","background_cleanliness","eyes_all_open","status","critique"],
-      },
-    },
-  },
-  required: ["photos"],
-};
+Output HARUS berupa JSON murni dengan format persis:
+{
+  "photos": [
+    {
+      "index": 0,
+      "focus_sharpness": 8.5,
+      "expression": 9.0,
+      "composition": 8.0,
+      "lighting": 8.5,
+      "background_cleanliness": 9.0,
+      "eyes_all_open": true,
+      "status": "KEEP_BEST",
+      "critique": "Fokus mata sangat tajam dan ekspresi senyum natural."
+    }
+  ]
+}`;
 
 /** Enforce zero-drop: pastikan tepat 1 KEEP_BEST per cluster. */
 export function enforceZeroDrop(v: ClusterVerdictT): ClusterVerdictT {
@@ -61,21 +53,58 @@ export function enforceZeroDrop(v: ClusterVerdictT): ClusterVerdictT {
   const winner = pool.reduce((a, b) => (overall(b) > overall(a) ? b : a));
   return {
     photos: v.photos.map((p) =>
-      p === winner ? { ...p, status: "KEEP_BEST" as const }
-      : p.status === "KEEP_BEST" ? { ...p, status: "ALTERNATIVE" as const } : p),
+      p === winner
+        ? { ...p, status: "KEEP_BEST" as const }
+        : p.status === "KEEP_BEST"
+        ? { ...p, status: "ALTERNATIVE" as const }
+        : p
+    ),
   };
 }
 
 export async function cullCluster(images: Buffer[]): Promise<ClusterVerdictT> {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-  const parts = images.flatMap((buf, i) => [
-    { text: `Foto index ${i}:` },
-    { inlineData: { mimeType: "image/jpeg", data: buf.toString("base64") } },
-  ]);
-  const res = await ai.models.generateContent({
-    model: MODEL,
-    contents: [{ role: "user", parts }],
-    config: { systemInstruction: SYSTEM_PROMPT, responseMimeType: "application/json", responseSchema, temperature: 0.2 },
+  const baseURL = process.env.AI_BASE_URL || "http://31.97.222.136:20129/v1";
+  const apiKey = process.env.AI_API_KEY || process.env.ANTIGRAVITY_API_KEY || "dummy";
+
+  const client = new OpenAI({ baseURL, apiKey });
+
+  const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+    {
+      type: "text",
+      text: `${SYSTEM_PROMPT}\n\nBerikut ${images.length} foto untuk dibandingkan berdampingan:`,
+    },
+  ];
+
+  images.forEach((buf, i) => {
+    content.push({
+      type: "text",
+      text: `--- Foto Index ${i} ---`,
+    });
+    content.push({
+      type: "image_url",
+      image_url: {
+        url: `data:image/jpeg;base64,${buf.toString("base64")}`,
+        detail: "high",
+      },
+    });
   });
-  return enforceZeroDrop(ClusterVerdict.parse(JSON.parse(res.text ?? "{}")));
+
+  const response = await client.chat.completions.create({
+    model: MODEL,
+    messages: [
+      {
+        role: "user",
+        content,
+      },
+    ],
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+  });
+
+  const text = response.choices[0]?.message?.content || "{}";
+  // Clean potential markdown blocks
+  const cleanJson = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+  const parsed = JSON.parse(cleanJson);
+
+  return enforceZeroDrop(ClusterVerdict.parse(parsed));
 }
