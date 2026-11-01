@@ -5,6 +5,7 @@ export const MODEL = process.env.VISION_MODEL || "antigravity-combo";
 
 export const PhotoVerdict = z.object({
   index: z.number().int(),
+  has_human_subject: z.boolean(),
   focus_sharpness: z.number().min(0).max(10),
   expression: z.number().min(0).max(10),
   composition: z.number().min(0).max(10),
@@ -17,20 +18,34 @@ export const PhotoVerdict = z.object({
 export const ClusterVerdict = z.object({ photos: z.array(PhotoVerdict) });
 export type ClusterVerdictT = z.infer<typeof ClusterVerdict>;
 
-export const SYSTEM_PROMPT = `Kamu adalah photo editor profesional untuk event & wedding. Kamu menerima N foto dari SATU rangkaian jepretan (burst/pose sama), diberi index 0..N-1.
-Bandingkan berdampingan menggunakan 5 pilar:
-1. Critical eye-focus & sharpness: fokus harus tajam di mata subjek utama. Motion blur/missed focus = gagal teknis (REJECTED). Shallow DoF/bokeh artistik atau creative framing = boleh (KEEP).
-2. Micro-expressions & zero blinking: foto grup/pelaminan GUGUR (REJECTED, eyes_all_open=false) jika ada subjek utama mata merem/setengah tertutup atau mulut terbuka canggung. Pilih peak emotion terbaik.
-3. Composition & framing: rule of thirds/leading lines/simetri/negative space. Tolak awkward cropping di sendi (pergelangan, lutut, dagu, dahi) dan horizon miring tidak disengaja.
-4. Lighting & exposure: detail gaun putih tidak blown-out, jas gelap tidak blocked-up, catchlight baik, tanpa bayangan keras/raccoon eyes.
-5. Background hygiene: objek tumbuh dari kepala, kru/photobomb, benda berantakan.
-Aturan WAJIB: tepat SATU foto berstatus KEEP_BEST (zero-drop rule). Sisanya ALTERNATIVE (layak tapi kalah bagus) atau REJECTED (gagal). Beri skor 0-10 per pilar dan critique singkat (1-2 kalimat, bahasa Indonesia).
+export const SYSTEM_PROMPT = `Kamu adalah photo editor profesional untuk event & wedding photography. Kamu menerima N foto dari SATU rangkaian jepretan (burst/pose sama), diberi index 0..N-1.
 
-Output HARUS berupa JSON murni dengan format persis:
+TUGAS UTAMA: Mengurasi foto dengan fokus pada SUBJEK MANUSIA / ORANG.
+
+ATURAN REJECT MUTLAK (Status = REJECTED):
+1. TIDAK ADA SUBJEK MANUSIA (has_human_subject = false): Foto tanaman, lantai, dinding, langit, pohon, atau benda mati yang bukan dekorasi/detail resmi acara LANGSUNG REJECT.
+2. GAGAL TEKNIS PARAH: Motion blur parah, miss focus total, atau gelap/terang berlebihan.
+3. MATA MEREM / BLINKING pada subjek utama (eyes_all_open = false).
+
+5 PILAR PENILAIAN FOTOGRAFI PROFESIONAL:
+1. Critical eye-focus & sharpness (0-10): Fokus tajam mengunci di mata orang.
+2. Micro-expressions & eyes (0-10): Senyum natural, mata terbuka, tidak sedang mengunyah/canggung.
+3. Composition & framing (0-10): Keseimbangan visual, tidak ada cropping canggung di sendi/leher.
+4. Lighting & exposure (0-10): Detail wajah dan pakaian terjaga, tidak clipping.
+5. Background hygiene (0-10): Bersih dari gangguan visual dan photobomb.
+
+ATURAN KEPUTUSAN (STATUS):
+- KEEP_BEST: Maksimal 1 foto terbaik dalam satu grup, DENGAN SYARAT: has_human_subject = true, eyes_all_open = true, dan rata-rata skor >= 5.5.
+- JIKA SEMUA FOTO DALAM GRUP ADALAH SAMPAH / TIDAK ADA ORANG / GAGAL TEKNIS: Beri SEMUA status REJECTED (tidak wajib ada pemenang jika kualitas tidak layak).
+- ALTERNATIVE: Foto yang bagus dan layak pakai tapi kalah sedikit dibanding pemenang.
+- REJECTED: Foto gagal, merem, blur, atau tanpa orang.
+
+Output HARUS berupa JSON murni:
 {
   "photos": [
     {
       "index": 0,
+      "has_human_subject": true,
       "focus_sharpness": 8.5,
       "expression": 9.0,
       "composition": 8.0,
@@ -43,22 +58,23 @@ Output HARUS berupa JSON murni dengan format persis:
   ]
 }`;
 
-/** Enforce zero-drop: pastikan tepat 1 KEEP_BEST per cluster. */
-export function enforceZeroDrop(v: ClusterVerdictT): ClusterVerdictT {
+/** Quality Gate & Conditional Zero-Drop */
+export function enforceQualityGate(v: ClusterVerdictT): ClusterVerdictT {
   const overall = (p: z.infer<typeof PhotoVerdict>) =>
     (p.focus_sharpness + p.expression + p.composition + p.lighting + p.background_cleanliness) / 5;
-  const keeps = v.photos.filter((p) => p.status === "KEEP_BEST");
-  if (keeps.length === 1 || v.photos.length === 0) return v;
-  const pool = keeps.length > 1 ? keeps : v.photos;
-  const winner = pool.reduce((a, b) => (overall(b) > overall(a) ? b : a));
+
   return {
-    photos: v.photos.map((p) =>
-      p === winner
-        ? { ...p, status: "KEEP_BEST" as const }
-        : p.status === "KEEP_BEST"
-        ? { ...p, status: "ALTERNATIVE" as const }
-        : p
-    ),
+    photos: v.photos.map((p) => {
+      const score = overall(p);
+      // Hard gate: no human OR eyes closed OR score < 5.2 -> automatically REJECTED
+      if (!p.has_human_subject || !p.eyes_all_open || score < 5.2) {
+        return {
+          ...p,
+          status: "REJECTED" as const,
+        };
+      }
+      return p;
+    }),
   };
 }
 
@@ -102,9 +118,8 @@ export async function cullCluster(images: Buffer[]): Promise<ClusterVerdictT> {
   });
 
   const text = response.choices[0]?.message?.content || "{}";
-  // Clean potential markdown blocks
   const cleanJson = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
   const parsed = JSON.parse(cleanJson);
 
-  return enforceZeroDrop(ClusterVerdict.parse(parsed));
+  return enforceQualityGate(ClusterVerdict.parse(parsed));
 }
