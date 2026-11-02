@@ -5,8 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 import { updatePhotoStatusAction, triggerSyncAction } from "@/app/actions/projects";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { LazyImage } from "@/components/LazyImage";
+import { KnowledgeBaseModal } from "@/components/KnowledgeBaseModal";
 import {
   Sparkles,
+  BookOpen,
+  HelpCircle,
   CheckCircle2,
   AlertCircle,
   EyeOff,
@@ -73,6 +76,7 @@ export function CullingWorkspace({
   const [photos, setPhotos] = useState<Photo[]>(initialPhotos);
   const [activeTab, setActiveTab] = useState<"ALL" | "KEEP_BEST" | "ALTERNATIVE" | "REJECTED">("ALL");
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [isKbOpen, setIsKbOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [columnsCount, setColumnsCount] = useState(3);
@@ -343,8 +347,17 @@ export function CullingWorkspace({
           </button>
         </div>
 
-        <div className="text-[11px] text-slate-500 hidden sm:block">
-          Klik foto untuk detail 5 pilar & critique AI
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setIsKbOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-900 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Rubrik Penilaian Fotografi</span>
+          </button>
+          <div className="text-[11px] text-slate-500 hidden lg:block">
+            • Klik foto untuk breakdown skor
+          </div>
         </div>
       </div>
 
@@ -498,6 +511,8 @@ export function CullingWorkspace({
         )}
       </div>
 
+      <KnowledgeBaseModal isOpen={isKbOpen} onClose={() => setIsKbOpen(false)} />
+
       {/* Detail Modal */}
       {selectedPhoto && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -546,8 +561,15 @@ export function CullingWorkspace({
 
                 {/* Score Breakdown (5 Pilar Fotografi Profesional) */}
                 <div className="space-y-3 mb-6">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    5 Pilar Kurasi Profesional
+                  <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <span>5 Pilar Kurasi Profesional</span>
+                    <button
+                      onClick={() => setIsKbOpen(true)}
+                      className="text-[10px] lowercase text-emerald-400 hover:underline flex items-center gap-1 font-normal"
+                    >
+                      <HelpCircle className="w-3 h-3" />
+                      baca panduan rubrik
+                    </button>
                   </div>
                   {selectedPhoto.ai_scores ? (
                     <div className="space-y-2 text-xs">
