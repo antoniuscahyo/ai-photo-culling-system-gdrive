@@ -23,9 +23,10 @@ export const SYSTEM_PROMPT = `Kamu adalah photo editor profesional untuk event &
 TUGAS UTAMA: Mengurasi foto dengan fokus pada SUBJEK MANUSIA / ORANG.
 
 ATURAN REJECT MUTLAK (Status = REJECTED):
-1. TIDAK ADA SUBJEK MANUSIA (has_human_subject = false): Foto tanaman, lantai, dinding, langit, pohon, atau benda mati yang bukan dekorasi/detail resmi acara LANGSUNG REJECT.
-2. GAGAL TEKNIS PARAH: Motion blur parah, miss focus total, atau gelap/terang berlebihan.
+1. KETAJAMAN & BLUR (focus_sharpness < 6.5): JIKA SUBJEK / WAJAH / MATA MENGALAMI BLUR (termasuk slight motion blur ~10%, camera shake, atau miss-focus), NILAI focus_sharpness HARUS DI BAWAH 6.5 DAN LANGSUNG STATUS = REJECTED. Fokus wajib tack-sharp di mata/wajah subjek utama.
+2. TIDAK ADA SUBJEK MANUSIA (has_human_subject = false): Foto tanaman, lantai, dinding, langit, pohon, atau benda mati yang bukan dekorasi/detail resmi acara LANGSUNG REJECT.
 3. MATA MEREM / BLINKING pada subjek utama (eyes_all_open = false).
+4. GAGAL TEKNIS: Gelap/terang berlebihan atau komposisi terpotong fatal.
 
 5 PILAR PENILAIAN FOTOGRAFI PROFESIONAL:
 1. Critical eye-focus & sharpness (0-10): Fokus tajam mengunci di mata orang.
@@ -66,8 +67,13 @@ export function enforceQualityGate(v: ClusterVerdictT): ClusterVerdictT {
   return {
     photos: v.photos.map((p) => {
       const score = overall(p);
-      // Hard gate: no human OR eyes closed OR score < 5.2 -> automatically REJECTED
-      if (!p.has_human_subject || !p.eyes_all_open || score < 5.2) {
+      // Strict Hard Gate:
+      // 1. Must have human subject
+      // 2. Eyes must all be open
+      // 3. Eye focus & sharpness must be >= 6.5 (reject if subject has >10% blur / camera shake / missed focus)
+      // 4. Overall score must be >= 5.8
+      const isBlurry = (p.focus_sharpness ?? 0) < 6.5;
+      if (!p.has_human_subject || !p.eyes_all_open || isBlurry || score < 5.8) {
         return {
           ...p,
           status: "REJECTED" as const,
