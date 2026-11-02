@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Camera, Sparkles, LogOut, Plus, FolderKanban } from "lucide-react";
+import { Camera, Sparkles, LogOut, Plus, FolderKanban, BookOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -49,7 +49,7 @@ export function Navbar() {
             </span>
           </Link>
 
-          <nav className="hidden sm:flex items-center gap-1">
+          <nav className="flex items-center gap-1">
             <Link
               href="/projects"
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
@@ -60,7 +60,21 @@ export function Navbar() {
             >
               <span className="flex items-center gap-1.5">
                 <FolderKanban className="w-3.5 h-3.5" />
-                Projects
+                <span>Projects</span>
+              </span>
+            </Link>
+
+            <Link
+              href="/rubrik"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                pathname === "/rubrik"
+                  ? "bg-slate-800 text-slate-100"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Rubrik Penilaian</span>
               </span>
             </Link>
           </nav>
