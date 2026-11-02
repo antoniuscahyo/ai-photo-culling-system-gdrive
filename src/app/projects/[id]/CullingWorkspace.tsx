@@ -57,6 +57,7 @@ export type Photo = {
     composition?: number;
     lighting?: number;
     background_cleanliness?: number;
+    straighten_angle_deg?: number;
   } | null;
   overall_score: number;
   eyes_all_open: boolean;
@@ -603,6 +604,21 @@ export function CullingWorkspace({
                           {selectedPhoto.ai_scores.background_cleanliness ?? "-"}/10
                         </span>
                       </div>
+
+                      {selectedPhoto.ai_scores.straighten_angle_deg !== undefined && (
+                        <div className="pt-2 mt-2 border-t border-slate-800/80 flex items-center justify-between text-slate-400 text-[11px]">
+                          <span>Auto Straighten / Horizon Tilt:</span>
+                          <span className={`font-mono font-semibold ${
+                            Math.abs(selectedPhoto.ai_scores.straighten_angle_deg) >= 0.2
+                              ? "text-sky-400"
+                              : "text-slate-400"
+                          }`}>
+                            {selectedPhoto.ai_scores.straighten_angle_deg > 0 ? "+" : ""}
+                            {selectedPhoto.ai_scores.straighten_angle_deg.toFixed(1)}°
+                            {Math.abs(selectedPhoto.ai_scores.straighten_angle_deg) >= 0.2 ? " (auto fix saat sync)" : " (lurus)"}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <p className="text-xs text-slate-500 italic">Belum dianalisis oleh AI.</p>

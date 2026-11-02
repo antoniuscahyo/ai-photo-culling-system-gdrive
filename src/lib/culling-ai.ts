@@ -12,6 +12,7 @@ export const PhotoVerdict = z.object({
   lighting: z.number().min(0).max(10),
   background_cleanliness: z.number().min(0).max(10),
   eyes_all_open: z.boolean(),
+  straighten_angle_deg: z.number().default(0), // Derajat rotasi perbaikan horizon (-15 s/d +15, 0 jika sudah lurus)
   status: z.enum(["KEEP_BEST", "ALTERNATIVE", "REJECTED"]),
   critique: z.string(),
 });
@@ -20,7 +21,7 @@ export type ClusterVerdictT = z.infer<typeof ClusterVerdict>;
 
 export const SYSTEM_PROMPT = `Kamu adalah photo editor profesional untuk event & wedding photography. Kamu menerima N foto dari SATU rangkaian jepretan (burst/pose sama), diberi index 0..N-1.
 
-TUGAS UTAMA: Mengurasi foto dengan fokus pada SUBJEK MANUSIA / ORANG.
+TUGAS UTAMA: Mengurasi foto dengan fokus pada SUBJEK MANUSIA / ORANG dan menganalisis GEOMETRI / KEMIRINGAN HORIZON.
 
 ATURAN REJECT MUTLAK (Status = REJECTED):
 1. KETAJAMAN & BLUR (focus_sharpness < 6.5): JIKA SUBJEK / WAJAH / MATA MENGALAMI BLUR (termasuk slight motion blur ~10%, camera shake, atau miss-focus), NILAI focus_sharpness HARUS DI BAWAH 6.5 DAN LANGSUNG STATUS = REJECTED. Fokus wajib tack-sharp di mata/wajah subjek utama.
@@ -34,6 +35,12 @@ ATURAN REJECT MUTLAK (Status = REJECTED):
 3. Composition & framing (0-10): Keseimbangan visual, tidak ada cropping canggung di sendi/leher.
 4. Lighting & exposure (0-10): Detail wajah dan pakaian terjaga, tidak clipping.
 5. Background hygiene (0-10): Bersih dari gangguan visual dan photobomb.
+
+ANALISIS TRANSFORM & GEOMETRY (straighten_angle_deg):
+- Periksa garis horizon, garis lantai, dinding, atau panggung.
+- Jika foto miring ke kanan, berikan derajat koreksi putar ke kiri (nilai negatif, misal: -2.5).
+- Jika foto miring ke kiri, berikan derajat koreksi putar ke kanan (nilai positif, misal: +3.0).
+- Jika foto sudah tegak/lurus, berikan 0.0. Nilai antara -15.0 s/d 15.0.
 
 ATURAN KEPUTUSAN (STATUS):
 - KEEP_BEST: Maksimal 1 foto terbaik dalam satu grup, DENGAN SYARAT: has_human_subject = true, eyes_all_open = true, dan rata-rata skor >= 5.5.
@@ -53,6 +60,7 @@ Output HARUS berupa JSON murni:
       "lighting": 8.5,
       "background_cleanliness": 9.0,
       "eyes_all_open": true,
+      "straighten_angle_deg": -1.5,
       "status": "KEEP_BEST",
       "critique": "Fokus mata sangat tajam dan ekspresi senyum natural."
     }
@@ -67,11 +75,6 @@ export function enforceQualityGate(v: ClusterVerdictT): ClusterVerdictT {
   return {
     photos: v.photos.map((p) => {
       const score = overall(p);
-      // Strict Hard Gate:
-      // 1. Must have human subject
-      // 2. Eyes must all be open
-      // 3. Eye focus & sharpness must be >= 6.5 (reject if subject has >10% blur / camera shake / missed focus)
-      // 4. Overall score must be >= 5.8
       const isBlurry = (p.focus_sharpness ?? 0) < 6.5;
       if (!p.has_human_subject || !p.eyes_all_open || isBlurry || score < 5.8) {
         return {

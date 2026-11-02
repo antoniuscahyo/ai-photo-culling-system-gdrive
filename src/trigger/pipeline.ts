@@ -4,6 +4,8 @@ import { admin, driveForUser, preflight } from "@/lib/gdrive";
 import { resizeThumbnail } from "@/lib/drive-url";
 import { dHash, technicalFilter, clusterPhotos } from "@/lib/image-analysis";
 import { cullCluster } from "@/lib/culling-ai";
+import { autoStraightenImage } from "@/lib/geometry";
+import { Readable } from "stream";
 
 const driveQueue = queue({ name: "gdrive", concurrencyLimit: 10 });
 const aiQueue = queue({ name: "gemini", concurrencyLimit: 3 });
@@ -133,7 +135,14 @@ export const cullProject = task({
           const row = chunk[v.index]; if (!row) continue;
           const avg = (v.focus_sharpness + v.expression + v.composition + v.lighting + v.background_cleanliness) / 5;
           await db.from("photos").update({
-            ai_scores: { focus_sharpness: v.focus_sharpness, expression: v.expression, composition: v.composition, lighting: v.lighting, background_cleanliness: v.background_cleanliness },
+            ai_scores: {
+              focus_sharpness: v.focus_sharpness,
+              expression: v.expression,
+              composition: v.composition,
+              lighting: v.lighting,
+              background_cleanliness: v.background_cleanliness,
+              straighten_angle_deg: v.straighten_angle_deg ?? 0,
+            },
             overall_score: avg, eyes_all_open: v.eyes_all_open, ai_critique: v.critique, cull_status: v.status,
           }).eq("id", row.id);
           if (v.status === "KEEP_BEST") await db.from("photo_clusters").update({ best_photo_id: row.id }).eq("id", c.id);
@@ -154,23 +163,53 @@ export const syncProject = task({
     if (!proj) throw new Error("project not found");
     await db.from("projects").update({ status: "SYNCING" }).eq("id", proj.id);
     const { drive } = await driveForUser(proj.user_id);
-    const { data: keep } = await db.from("photos").select("id,gdrive_file_id")
+    const { data: keep } = await db.from("photos").select("id,gdrive_file_id,file_name,ai_scores")
       .eq("project_id", proj.id).eq("cull_status", "KEEP_BEST").eq("is_synced_to_gdrive", false);
     for (const k of keep ?? []) {
       let synced: string | null | undefined;
-      if (proj.sync_mode === "MOVE") {
-        const r = await drive.files.update({
-          fileId: k.gdrive_file_id, addParents: proj.destination_folder_id, removeParents: proj.source_folder_id,
-          fields: "id", supportsAllDrives: true,
+      const angle = (k.ai_scores as { straighten_angle_deg?: number } | null)?.straighten_angle_deg ?? 0;
+
+      // If angle needs straightening (|angle| >= 0.2 deg), fetch raw buffer, straighten, and upload to Destination
+      if (Math.abs(angle) >= 0.2) {
+        logger.info(`Auto-straightening ${k.file_name} with angle: ${angle}°`);
+        const originalBuf = await fetchPhotoBuffer(drive, k.gdrive_file_id);
+        const straightenedBuf = await autoStraightenImage(originalBuf, angle);
+
+        const r = await drive.files.create({
+          requestBody: {
+            name: k.file_name,
+            parents: [proj.destination_folder_id],
+          },
+          media: {
+            mimeType: "image/jpeg",
+            body: Readable.from(straightenedBuf),
+          },
+          fields: "id",
+          supportsAllDrives: true,
         });
         synced = r.data.id;
+
+        // If mode is MOVE, remove the original file from source folder
+        if (proj.sync_mode === "MOVE") {
+          await drive.files.delete({ fileId: k.gdrive_file_id, supportsAllDrives: true });
+        }
       } else {
-        const r = await drive.files.copy({
-          fileId: k.gdrive_file_id, requestBody: { parents: [proj.destination_folder_id] },
-          fields: "id", supportsAllDrives: true,
-        });
-        synced = r.data.id;
+        // Already straight: use fast GDrive server-side copy/move
+        if (proj.sync_mode === "MOVE") {
+          const r = await drive.files.update({
+            fileId: k.gdrive_file_id, addParents: proj.destination_folder_id, removeParents: proj.source_folder_id,
+            fields: "id", supportsAllDrives: true,
+          });
+          synced = r.data.id;
+        } else {
+          const r = await drive.files.copy({
+            fileId: k.gdrive_file_id, requestBody: { parents: [proj.destination_folder_id] },
+            fields: "id", supportsAllDrives: true,
+          });
+          synced = r.data.id;
+        }
       }
+
       await db.from("photos").update({ synced_file_id: synced, is_synced_to_gdrive: true }).eq("id", k.id);
     }
     await db.from("projects").update({ status: "COMPLETED" }).eq("id", proj.id);
