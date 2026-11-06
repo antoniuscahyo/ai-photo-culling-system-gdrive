@@ -1,5 +1,7 @@
 # AI Photo Culling System (GDrive SSO Edition)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
+
 Internal tool berbasis AI untuk memangkas waktu seleksi ribuan foto event & wedding photography di Google Drive dari **4–8 jam** menjadi **kurang dari 10 menit** menggunakan standar kurasi fotografer profesional.
 
 Foto yang lolos seleksi langsung disinkronkan secara flat ke 1 folder tujuan Google Drive tanpa subfolder rumit.
