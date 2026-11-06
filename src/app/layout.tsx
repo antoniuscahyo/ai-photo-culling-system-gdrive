@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
+import { I18nProvider } from "@/lib/i18n/context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "AI Photo Culling System (GDrive)",
-  description: "Automated event and wedding photography culling with professional standards and Gemini 2.5 Flash",
+  description: "Automated event and wedding photography culling with professional standards and Gemini Vision AI",
 };
 
 export default function RootLayout({
@@ -28,8 +29,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-950 text-slate-100 min-h-screen flex flex-col`}
       >
-        <Navbar />
-        <main className="flex-1 flex flex-col">{children}</main>
+        <I18nProvider>
+          <Navbar />
+          <main className="flex-1 flex flex-col">{children}</main>
+        </I18nProvider>
       </body>
     </html>
   );

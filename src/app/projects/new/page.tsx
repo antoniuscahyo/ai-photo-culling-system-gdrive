@@ -6,9 +6,12 @@ import { createProjectAction } from "@/app/actions/projects";
 import { extractFolderId } from "@/lib/drive-url";
 import { FolderSync, ArrowLeft, Check, Sparkles, AlertCircle, Copy, Move, Info } from "lucide-react";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n/context";
 
 export default function NewProjectPage() {
   const router = useRouter();
+  const { t } = useI18n();
+
   const [name, setName] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
@@ -25,19 +28,19 @@ export default function NewProjectPage() {
     setError(null);
 
     if (!name.trim()) {
-      setError("Silakan masukkan nama acara/proyek.");
+      setError("Please enter a project name.");
       return;
     }
     if (!sourceId) {
-      setError("URL atau ID Google Drive Source Folder tidak valid.");
+      setError("Invalid Google Drive Source Folder URL or ID.");
       return;
     }
     if (!destId) {
-      setError("URL atau ID Google Drive Destination Folder tidak valid.");
+      setError("Invalid Google Drive Destination Folder URL or ID.");
       return;
     }
     if (sourceId === destId) {
-      setError("Folder Source dan Folder Destination tidak boleh sama.");
+      setError("Source Folder and Destination Folder cannot be the same.");
       return;
     }
 
@@ -57,7 +60,7 @@ export default function NewProjectPage() {
         router.push(`/projects/${res.projectId}`);
       }
     } catch (err: unknown) {
-      setError((err as Error)?.message || "Terjadi kesalahan saat memproses proyek.");
+      setError((err as Error)?.message || "An unexpected error occurred.");
       setLoading(false);
     }
   };
@@ -69,7 +72,7 @@ export default function NewProjectPage() {
         className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition mb-6"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
-        Kembali ke Daftar Projects
+        {t("backToProjects")}
       </Link>
 
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl">
@@ -79,10 +82,10 @@ export default function NewProjectPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">
-              Mulai Culling Project Baru
+              {t("newProjectHeading")}
             </h1>
             <p className="text-xs text-slate-400">
-              Hubungkan folder Google Drive foto mentahan & folder hasil kurasi
+              {t("newProjectSubheading")}
             </p>
           </div>
         </div>
@@ -97,12 +100,12 @@ export default function NewProjectPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-              Project / Event Name
+              {t("projectNameLabel")}
             </label>
             <input
               type="text"
               required
-              placeholder="Contoh: Wedding Andi & Rina"
+              placeholder={t("projectNamePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 transition"
@@ -112,7 +115,7 @@ export default function NewProjectPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                Source Folder Link (Foto Mentah)
+                {t("sourceUrlLabel")}
               </label>
               {sourceId && (
                 <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
@@ -124,20 +127,20 @@ export default function NewProjectPage() {
             <input
               type="text"
               required
-              placeholder="https://drive.google.com/drive/folders/..."
+              placeholder={t("sourceUrlPlaceholder")}
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 transition font-mono text-xs"
             />
             <p className="text-[11px] text-slate-500 mt-1.5">
-              URL folder Google Drive tempat foto mentahan (raw/jpeg) berada.
+              {t("sourceUrlHint")}
             </p>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                Destination Folder Link (Hasil Seleksi)
+                {t("destUrlLabel")}
               </label>
               {destId && (
                 <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
@@ -149,19 +152,19 @@ export default function NewProjectPage() {
             <input
               type="text"
               required
-              placeholder="https://drive.google.com/drive/folders/..."
+              placeholder={t("destUrlPlaceholder")}
               value={destinationUrl}
               onChange={(e) => setDestinationUrl(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 transition font-mono text-xs"
             />
             <p className="text-[11px] text-slate-500 mt-1.5">
-              Folder tujuan di Google Drive. Semua foto lolos seleksi akan disinkronkan secara flat ke 1 folder ini.
+              {t("destUrlHint")}
             </p>
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-              Sync Action Mode
+              {t("syncModeLabel")}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
@@ -176,14 +179,14 @@ export default function NewProjectPage() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2 font-semibold text-sm">
                     <Copy className="w-4 h-4 text-emerald-400" />
-                    <span>COPY (Default)</span>
+                    <span>{t("copyModeTitle")}</span>
                   </div>
                   {syncMode === "COPY" && (
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
                   )}
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Menyalin foto terpilih ke folder Destination. File asli di folder Source tetap utuh dan aman.
+                  {t("copyModeDesc")}
                 </p>
               </button>
 
@@ -199,14 +202,14 @@ export default function NewProjectPage() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2 font-semibold text-sm">
                     <Move className="w-4 h-4 text-amber-400" />
-                    <span>MOVE</span>
+                    <span>{t("moveModeTitle")}</span>
                   </div>
                   {syncMode === "MOVE" && (
                     <div className="w-2 h-2 rounded-full bg-amber-400" />
                   )}
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Memindahkan file asli langsung ke Destination. Menghemat kuota penyimpanan Google Drive.
+                  {t("moveModeDesc")}
                 </p>
               </button>
             </div>
@@ -215,7 +218,7 @@ export default function NewProjectPage() {
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-start gap-2.5">
             <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
             <div className="leading-relaxed">
-              Sistem akan melakukan <strong>pre-flight check</strong> untuk memverifikasi akun Google Anda memiliki hak akses baca di Source dan hak akses tambah file di Destination.
+              {t("preflightNotice")}
             </div>
           </div>
 
@@ -227,12 +230,12 @@ export default function NewProjectPage() {
             {loading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Memvalidasi & Memulai Pipeline...</span>
+                <span>{t("validatingPipelineBtn")}</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                <span>Mulai AI Culling Pipeline</span>
+                <span>{t("startPipelineBtn")}</span>
               </>
             )}
           </button>

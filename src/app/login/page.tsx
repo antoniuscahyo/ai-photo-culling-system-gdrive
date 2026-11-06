@@ -3,17 +3,19 @@
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { Camera, Sparkles, ShieldCheck, ArrowRight, FolderSync } from "lucide-react";
+import { useI18n } from "@/lib/i18n/context";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
 
   const handleLogin = async () => {
     try {
       setLoading(true);
       setError(null);
       const supabase = createClient();
-      
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -34,7 +36,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-slate-950 text-slate-100 p-4">
+    <div className="min-h-[calc(100vh-64px)] flex flex-col justify-center items-center bg-slate-950 text-slate-100 p-4">
       <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
         <div className="flex items-center justify-center gap-3 mb-6">
           <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
@@ -42,25 +44,25 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
-              AI Photo Culling
+              {t("appTitle")}
               <Sparkles className="w-4 h-4 text-emerald-400" />
             </h1>
-            <p className="text-xs text-slate-400">GDrive Event & Wedding Photography</p>
+            <p className="text-xs text-slate-400">{t("appSubtitle")}</p>
           </div>
         </div>
 
         <div className="space-y-4 mb-8 text-sm text-slate-300">
           <p className="text-slate-400 text-xs leading-relaxed">
-            Pangkas seleksi 3.000+ foto Google Drive dari 4-8 jam menjadi di bawah 10 menit dengan standar kurasi fotografer profesional & AI Vision.
+            {t("loginHeroDesc")}
           </p>
           <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 space-y-2 text-xs">
             <div className="flex items-center gap-2 text-slate-300">
               <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Login menggunakan Google SSO pribadi/kantor</span>
+              <span>{t("loginSsoBenefit")}</span>
             </div>
             <div className="flex items-center gap-2 text-slate-300">
               <FolderSync className="w-4 h-4 text-sky-400 shrink-0" />
-              <span>Akses baca folder Source & salin ke Destination</span>
+              <span>{t("loginDriveBenefit")}</span>
             </div>
           </div>
         </div>
@@ -98,7 +100,7 @@ export default function LoginPage() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              <span>Sign in with Google</span>
+              <span>{t("signInWithGoogle")}</span>
               <ArrowRight className="w-4 h-4 text-slate-500 ml-auto" />
             </>
           )}

@@ -6,6 +6,7 @@ import { updatePhotoStatusAction, triggerSyncAction } from "@/app/actions/projec
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { LazyImage } from "@/components/LazyImage";
 import { KnowledgeBaseModal } from "@/components/KnowledgeBaseModal";
+import { useI18n } from "@/lib/i18n/context";
 import {
   Sparkles,
   BookOpen,
@@ -73,6 +74,7 @@ export function CullingWorkspace({
   initialProject: Project;
   initialPhotos: Photo[];
 }) {
+  const { t } = useI18n();
   const [project, setProject] = useState<Project>(initialProject);
   const [photos, setPhotos] = useState<Photo[]>(initialPhotos);
   const [activeTab, setActiveTab] = useState<"ALL" | "KEEP_BEST" | "ALTERNATIVE" | "REJECTED">("ALL");
@@ -235,7 +237,7 @@ export function CullingWorkspace({
                 rel="noreferrer"
                 className="text-emerald-400 hover:underline flex items-center gap-1"
               >
-                Buka Folder Tujuan <ExternalLink className="w-3 h-3" />
+                {t("openDestFolder")} <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           </div>
@@ -245,17 +247,17 @@ export function CullingWorkspace({
             {project.status === "SCANNING" ? (
               <div className="flex items-center gap-2 bg-sky-500/10 border border-sky-500/20 text-sky-400 px-3.5 py-2 rounded-xl text-xs font-medium">
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>AI Pipeline Sedang Berjalan...</span>
+                <span>{t("pipelineRunning")}</span>
               </div>
             ) : project.status === "SYNCING" ? (
               <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3.5 py-2 rounded-xl text-xs font-medium">
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Sinkronisasi ke GDrive...</span>
+                <span>{t("syncingToGdrive")}</span>
               </div>
             ) : project.status === "COMPLETED" ? (
               <div className="flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 text-teal-400 px-3.5 py-2 rounded-xl text-xs font-medium">
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Selesai Disinkronkan</span>
+                <span>{t("syncedCompleted")}</span>
               </div>
             ) : (
               <button
@@ -264,7 +266,7 @@ export function CullingWorkspace({
                 className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-md transition cursor-pointer"
               >
                 <FolderSync className="w-4 h-4" />
-                <span>Sync {stats.KEEP_BEST} Foto ke Destination</span>
+                <span>{t("syncKeepBestBtn").replace("{count}", String(stats.KEEP_BEST))}</span>
               </button>
             )}
           </div>
@@ -274,7 +276,7 @@ export function CullingWorkspace({
         {project.status === "SCANNING" && (
           <div className="mt-4 pt-3 border-t border-slate-800">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
-              <span>Memproses analisis gambar & kurasi Gemini Vision AI...</span>
+              <span>{t("progressDesc")}</span>
               <span className="font-mono text-emerald-400 font-medium">
                 {project.processed_photos || 0} / {project.total_photos || 0} foto
               </span>
@@ -313,7 +315,7 @@ export function CullingWorkspace({
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            Semua ({photos.length})
+            {t("tabAll")} ({photos.length})
           </button>
           <button
             onClick={() => setActiveTab("KEEP_BEST")}
@@ -324,7 +326,7 @@ export function CullingWorkspace({
             }`}
           >
             <Star className="w-3.5 h-3.5 fill-current" />
-            Keep Best ({stats.KEEP_BEST})
+            {t("tabKeepBest")} ({stats.KEEP_BEST})
           </button>
           <button
             onClick={() => setActiveTab("ALTERNATIVE")}
@@ -334,7 +336,7 @@ export function CullingWorkspace({
                 : "text-slate-400 hover:text-amber-400"
             }`}
           >
-            Alternative ({stats.ALTERNATIVE})
+            {t("tabAlternative")} ({stats.ALTERNATIVE})
           </button>
           <button
             onClick={() => setActiveTab("REJECTED")}
@@ -344,7 +346,7 @@ export function CullingWorkspace({
                 : "text-slate-400 hover:text-rose-400"
             }`}
           >
-            Rejected ({stats.REJECTED})
+            {t("tabRejected")} ({stats.REJECTED})
           </button>
         </div>
 
@@ -354,10 +356,10 @@ export function CullingWorkspace({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-900 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
           >
             <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Rubrik Penilaian Fotografi</span>
+            <span>{t("viewRubricBtn")}</span>
           </button>
           <div className="text-[11px] text-slate-500 hidden lg:block">
-            • Klik foto untuk breakdown skor
+            • {t("clickPhotoHint")}
           </div>
         </div>
       </div>
@@ -367,7 +369,7 @@ export function CullingWorkspace({
         {filteredPhotos.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center text-slate-500 text-xs">
             <Camera className="w-8 h-8 mb-2 opacity-50" />
-            <span>Tidak ada foto di kategori ini.</span>
+            <span>{t("noPhotosInTab")}</span>
           </div>
         ) : (
           <div
@@ -563,43 +565,43 @@ export function CullingWorkspace({
                 {/* Score Breakdown (5 Pilar Fotografi Profesional) */}
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    <span>5 Pilar Kurasi Profesional</span>
+                    <span>{t("pilarHeader")}</span>
                     <button
                       onClick={() => setIsKbOpen(true)}
                       className="text-[10px] lowercase text-emerald-400 hover:underline flex items-center gap-1 font-normal"
                     >
                       <HelpCircle className="w-3 h-3" />
-                      baca panduan rubrik
+                      {t("readRubricGuidance")}
                     </button>
                   </div>
                   {selectedPhoto.ai_scores ? (
                     <div className="space-y-2 text-xs">
                       <div className="flex items-center justify-between text-slate-300">
-                        <span>1. Eye Focus & Sharpness:</span>
+                        <span>{t("pilarFocus")}:</span>
                         <span className="font-mono font-semibold text-emerald-400">
                           {selectedPhoto.ai_scores.focus_sharpness ?? "-"}/10
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-slate-300">
-                        <span>2. Micro-Expression & Eyes:</span>
+                        <span>{t("pilarExpression")}:</span>
                         <span className="font-mono font-semibold text-emerald-400">
                           {selectedPhoto.ai_scores.expression ?? "-"}/10
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-slate-300">
-                        <span>3. Composition & Framing:</span>
+                        <span>{t("pilarComposition")}:</span>
                         <span className="font-mono font-semibold text-emerald-400">
                           {selectedPhoto.ai_scores.composition ?? "-"}/10
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-slate-300">
-                        <span>4. Lighting & Exposure:</span>
+                        <span>{t("pilarLighting")}:</span>
                         <span className="font-mono font-semibold text-emerald-400">
                           {selectedPhoto.ai_scores.lighting ?? "-"}/10
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-slate-300">
-                        <span>5. Background Hygiene:</span>
+                        <span>{t("pilarBackground")}:</span>
                         <span className="font-mono font-semibold text-emerald-400">
                           {selectedPhoto.ai_scores.background_cleanliness ?? "-"}/10
                         </span>
@@ -607,7 +609,7 @@ export function CullingWorkspace({
 
                       {selectedPhoto.ai_scores.straighten_angle_deg !== undefined && (
                         <div className="pt-2 mt-2 border-t border-slate-800/80 flex items-center justify-between text-slate-400 text-[11px]">
-                          <span>Auto Straighten / Horizon Tilt:</span>
+                          <span>{t("autoStraightenBadge")}</span>
                           <span className={`font-mono font-semibold ${
                             Math.abs(selectedPhoto.ai_scores.straighten_angle_deg) >= 0.2
                               ? "text-sky-400"
@@ -615,7 +617,7 @@ export function CullingWorkspace({
                           }`}>
                             {selectedPhoto.ai_scores.straighten_angle_deg > 0 ? "+" : ""}
                             {selectedPhoto.ai_scores.straighten_angle_deg.toFixed(1)}°
-                            {Math.abs(selectedPhoto.ai_scores.straighten_angle_deg) >= 0.2 ? " (auto fix saat sync)" : " (lurus)"}
+                            {Math.abs(selectedPhoto.ai_scores.straighten_angle_deg) >= 0.2 ? ` (${t("autoFixOnSync")})` : ` (${t("straight")})`}
                           </span>
                         </div>
                       )}
@@ -630,7 +632,7 @@ export function CullingWorkspace({
                   <div className="mb-6 p-3 bg-slate-950 border border-slate-800 rounded-xl">
                     <div className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1 mb-1">
                       <Sparkles className="w-3 h-3" />
-                      Critique Fotografer AI
+                      {t("aiCritiqueHeader")}
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed">
                       {selectedPhoto.ai_critique}
@@ -642,7 +644,7 @@ export function CullingWorkspace({
               {/* Action Buttons in Modal */}
               <div className="pt-4 border-t border-slate-800 space-y-2">
                 <div className="text-[11px] text-slate-400 uppercase font-semibold">
-                  Ubah Keputusan Kurasi:
+                  {t("changeVerdict")}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <button
